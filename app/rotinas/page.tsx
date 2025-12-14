@@ -17,6 +17,7 @@ type RoutineActivity = {
   createdAt: string;
   visibility: 'pessoal' | 'time';
   createdByRole?: string;
+  createdByName?: string;
 };
 
 const categoryEmoji: Record<string, string> = {
@@ -59,6 +60,9 @@ export default function RotinasPage() {
 
   const userId =
     typeof window !== 'undefined' ? Number(localStorage.getItem('userId')) : null;
+
+  const userName =
+  typeof window !== 'undefined' ? localStorage.getItem('userName') : null;
 
   const isGestor = userRole === 'gestor';
 
@@ -108,15 +112,17 @@ export default function RotinasPage() {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({
-          title: routineTitle,
-          description: routineDescription,
-          category: routineCategory,
-          visibility: routineVisibility,
-          startTime: startDateTime.toISOString(),
-          userId,
-          status: 'pendente',
-          createdByRole: userRole,
-        }),
+  title: routineTitle,
+  description: routineDescription,
+  category: routineCategory,
+  visibility: routineVisibility,
+  startTime: startDateTime.toISOString(),
+  userId,
+  status: 'pendente',
+  createdByRole: userRole,
+  createdByName: userName, // 👈 aqui
+}),
+
       });
 
       if (!res.ok) {
@@ -424,12 +430,22 @@ export default function RotinasPage() {
                             <div className="d-flex justify-content-between align-items-start">
                               <div className="flex-grow-1">
                                 <h6 className="fw-bold mb-1">
-                                  {categoryEmoji[activity.category]}{' '}
-                                  {activity.title}
-                                </h6>
-                                <p className="text-muted small mb-2">
-                                  {activity.description}
-                                </p>
+  {categoryEmoji[activity.category]} {activity.title}
+</h6>
+
+{activity.createdByName && activity.visibility === 'time' && (
+  <small className="text-muted d-block mb-2">
+    👤 Criado por: {activity.createdByName}
+  </small>
+)}
+
+{activity.description && (
+  <p style={{ margin: '0 0 8px 0', color: '#666' }}>
+    {activity.description}
+  </p>
+)}
+
+
                                 <small className="text-muted d-block mb-1">
                                   ⏰{' '}
                                   {new Date(
