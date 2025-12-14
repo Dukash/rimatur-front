@@ -23,16 +23,13 @@ type User = {
 };
 
 const CheckStatusIcon: React.FC<{ msg: Message; isOwn: boolean }> = ({ msg, isOwn }) => {
-  if (!isOwn) return null; // só mostra check nas mensagens que EU enviei
+  if (!isOwn) return null;
 
   const style: React.CSSProperties = {
     fontSize: '11px',
     marginLeft: '6px',
   };
 
-  // usando só isRead:
-  // - não lida  -> ✓✓ cinza
-  // - lida      -> ✓✓ azul
   if (!msg.isRead) {
     return <span style={{ ...style, color: '#777' }}>✓✓</span>;
   }
@@ -48,6 +45,7 @@ export default function MessagesPage() {
   const [userId, setUserId] = useState<number | null>(null);
   const [userName, setUserName] = useState('');
   const [selectedUserId, setSelectedUserId] = useState<number | null>(null);
+  const [selectedUserName, setSelectedUserName] = useState('');
 
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState('');
@@ -59,32 +57,29 @@ export default function MessagesPage() {
   const markedAsReadRef = useRef<Set<number>>(new Set());
   const messagesEndRef = useRef<HTMLDivElement>(null);
 
-  // pega dados do usuário logado via localStorage
- useEffect(() => {
-  const token =
-    typeof window !== 'undefined' ? localStorage.getItem('token') : null;
-  if (!token) {
-    router.push('/login');
-    return;
-  }
+  useEffect(() => {
+    const token =
+      typeof window !== 'undefined' ? localStorage.getItem('token') : null;
+    if (!token) {
+      router.push('/login');
+      return;
+    }
 
-  const storedUserId =
-    typeof window !== 'undefined' ? localStorage.getItem('userId') : null;
-  const storedUserName =
-    typeof window !== 'undefined' ? localStorage.getItem('userName') : null;
+    const storedUserId =
+      typeof window !== 'undefined' ? localStorage.getItem('userId') : null;
+    const storedUserName =
+      typeof window !== 'undefined' ? localStorage.getItem('userName') : null;
 
-  if (storedUserId) setUserId(Number(storedUserId));
-  if (storedUserName) setUserName(storedUserName || '');
-}, [router]);
+    if (storedUserId) setUserId(Number(storedUserId));
+    if (storedUserName) setUserName(storedUserName || '');
+  }, [router]);
 
-  // carrega usuários e mensagens depois que o userId estiver setado
   useEffect(() => {
     if (!userId) return;
     loadUsers();
     loadMessages(null);
   }, [userId]);
 
-  // scroll automático para o fim da conversa
   useEffect(() => {
     messagesEndRef.current?.scrollIntoView({ behavior: 'smooth' });
   }, [conversationMessages]);
@@ -112,7 +107,15 @@ export default function MessagesPage() {
       if (!res.ok) throw new Error('Erro ao carregar mensagens');
 
       const data = await res.json();
-      const list = Array.isArray(data) ? data : [];
+      let list = Array.isArray(data) ? data : [];
+
+      // Se tem um receiverId selecionado, filtra SÓ as mensagens com aquela pessoa
+      if (selectedReceiverId) {
+        list = list.filter(msg => 
+          (msg.sender.id === userId && msg.receiver.id === selectedReceiverId) ||
+          (msg.sender.id === selectedReceiverId && msg.receiver.id === userId)
+        );
+      }
 
       // lista geral (para o painel de mensagens)
       setMessages(list);
@@ -151,11 +154,12 @@ export default function MessagesPage() {
       setSubject('');
       setBody('');
 
-      // recarrega o histórico da conversa atual (se houver)
       const recId = receiverId ? Number(receiverId) : null;
       await loadMessages(recId);
       if (recId) {
         setSelectedUserId(recId);
+        const user = users.find(u => u.id === recId);
+        if (user) setSelectedUserName(user.name);
       }
     } catch (err: any) {
       setError(err.message);
@@ -166,6 +170,8 @@ export default function MessagesPage() {
 
   const handleSelectConversation = (otherUserId: number) => {
     setSelectedUserId(otherUserId);
+    const user = users.find(u => u.id === otherUserId);
+    if (user) setSelectedUserName(user.name);
     loadMessages(otherUserId);
   };
 
@@ -195,6 +201,7 @@ export default function MessagesPage() {
       const data = await res.json();
       setMessages(Array.isArray(data) ? data : []);
       setSelectedUserId(null);
+      setSelectedUserName('');
       setConversationMessages([]);
     } catch (err: any) {
       setError(err.message);
@@ -203,7 +210,6 @@ export default function MessagesPage() {
     }
   }
 
-  // marca como lidas
   useEffect(() => {
     const markAsRead = async (messageId: number) => {
       if (markedAsReadRef.current.has(messageId)) return;
@@ -229,21 +235,6 @@ export default function MessagesPage() {
 
   const unreadCount = messages.filter((m) => !m.isRead).length;
 
-  // nome do usuário selecionado, baseado no histórico da conversa atual
-  const selectedUserName =
-    selectedUserId && conversationMessages.length > 0
-      ? (() => {
-          const example = conversationMessages.find(
-            (m) =>
-              m.sender.id === selectedUserId || m.receiver.id === selectedUserId
-          );
-          if (!example) return '';
-          return example.sender.id === selectedUserId
-            ? example.sender.name
-            : example.receiver.name;
-        })()
-      : '';
-
   return (
     <div
       className="min-h-screen d-flex flex-column"
@@ -262,16 +253,12 @@ export default function MessagesPage() {
         <div className="container-lg">
           <div className="d-flex justify-content-between align-items-center">
             <div>
-              <h1 className="h3 mb-0 fw-bold">💬 Mensagens</h1>
+              <h1 className="h3 mb-0 fw-bold">💬 Sistema de Mensagens</h1>
               <small>
-                {unreadCount > 0 && `${unreadCount} não lida(s) - `}
-                Comunique-se com sua equipe
+                Bem vindo {userName}! ID: {userId}
               </small>
             </div>
             <div className="d-flex gap-2 align-items-center">
-              <span style={{ fontSize: '14px', fontWeight: 'bold' }}>
-                👤 {userName}
-              </span>
               <button
                 onClick={handleLogout}
                 className="btn btn-sm"
@@ -334,10 +321,13 @@ export default function MessagesPage() {
                         className="form-select form-select-lg"
                         value={receiverId}
                         onChange={(e) => {
-                          const value = e.target.value
-                            ? Number(e.target.value)
-                            : '';
+                          const value = e.target.value ? Number(e.target.value) : '';
                           setReceiverId(value as any);
+
+                          // SE SELECIONOU ALGUÉM, ABRE A CONVERSA
+                          if (value) {
+                            handleSelectConversation(value as number);
+                          }
                         }}
                         required
                         style={{
@@ -439,6 +429,7 @@ export default function MessagesPage() {
                         setSearch('');
                         loadMessages(null);
                         setSelectedUserId(null);
+                        setSelectedUserName('');
                         setConversationMessages([]);
                       }}
                       disabled={loading}
@@ -481,71 +472,79 @@ export default function MessagesPage() {
                         <p>Nenhuma mensagem nesta conversa</p>
                       </div>
                     ) : (
-                      conversationMessages.map((msg) => (
-                        <div
-                          key={msg.id}
-                          style={{
-                            marginBottom: '12px',
-                            display: 'flex',
-                            justifyContent:
-                              msg.sender.id === userId ? 'flex-end' : 'flex-start',
-                          }}
-                        >
+                      [...conversationMessages]
+                        .sort((a, b) =>
+                          new Date(a.createdAt).getTime() -
+                          new Date(b.createdAt).getTime()
+                        )
+                        .map((msg) => (
                           <div
+                            key={msg.id}
                             style={{
-                              maxWidth: '65%',
-                              padding: '10px 14px',
-                              borderRadius: '8px',
-                              backgroundColor:
-                                msg.sender.id === userId ? '#c8e6c9' : '#fff',
-                              borderColor:
-                                msg.sender.id === userId ? 'none' : '#e0e0e0',
-                              border:
-                                msg.sender.id === userId
-                                  ? 'none'
-                                  : '1px solid #e0e0e0',
+                              marginBottom: '12px',
+                              display: 'flex',
+                              justifyContent:
+                                msg.sender.id === userId ? 'flex-end' : 'flex-start',
                             }}
                           >
-                            <p
+                            <div
                               style={{
-                                fontSize: '12px',
-                                fontWeight: 'bold',
-                                marginBottom: '4px',
-                                color: '#88453d',
+                                maxWidth: '65%',
+                                padding: '10px 14px',
+                                borderRadius: '8px',
+                                backgroundColor:
+                                  msg.sender.id === userId ? '#c8e6c9' : '#fff',
+                                border:
+                                  msg.sender.id === userId
+                                    ? 'none'
+                                    : '1px solid #e0e0e0',
                               }}
                             >
-                              {msg.sender.name}
-                            </p>
-                            <p
-                              style={{ margin: '4px 0', fontSize: '14px' }}
-                            >
-                              {msg.body}
-                            </p>
-                            <small
-  style={{
-    opacity: 0.7,
-    fontSize: '11px',
-    display: 'flex',
-    justifyContent: 'flex-end',
-    alignItems: 'center',
-  }}
->
-  {new Date(msg.createdAt).toLocaleTimeString('pt-BR', {
-    hour: '2-digit',
-    minute: '2-digit',
-  })}
-  <CheckStatusIcon msg={msg} isOwn={msg.sender.id === userId} />
-</small>
-
+                              <p
+                                style={{
+                                  fontSize: '12px',
+                                  fontWeight: 'bold',
+                                  marginBottom: '4px',
+                                  color: '#88453d',
+                                }}
+                              >
+                                {msg.sender.name}
+                              </p>
+                              <p
+                                style={{ margin: '4px 0', fontSize: '14px' }}
+                              >
+                                {msg.body}
+                              </p>
+                              <small
+                                style={{
+                                  opacity: 0.7,
+                                  fontSize: '11px',
+                                  display: 'flex',
+                                  justifyContent: 'flex-end',
+                                  alignItems: 'center',
+                                }}
+                              >
+                                {new Date(msg.createdAt).toLocaleTimeString(
+                                  'pt-BR',
+                                  {
+                                    hour: '2-digit',
+                                    minute: '2-digit',
+                                  }
+                                )}
+                                <CheckStatusIcon
+                                  msg={msg}
+                                  isOwn={msg.sender.id === userId}
+                                />
+                              </small>
+                            </div>
                           </div>
-                        </div>
-                      ))
+                        ))
                     )}
                     <div ref={messagesEndRef} />
                   </div>
                 </div>
               ) : (
-                // Lista de Mensagens Recentes
+                // Lista de Mensagens Recentes - COM PREVIEW
                 <div className="card shadow-sm border-0">
                   <div className="card-body p-4">
                     <h5
@@ -563,59 +562,90 @@ export default function MessagesPage() {
                         <p className="text-muted">Nenhuma mensagem encontrada</p>
                       </div>
                     ) : (
-                      <div className="space-y-3">
-                        {messages.map((msg) => (
-                          <div
-                            key={msg.id}
-                            onClick={() =>
-                              handleSelectConversation(
-                                msg.sender.id === userId
-                                  ? msg.receiver.id
-                                  : msg.sender.id
-                              )
-                            }
-                            className="card border"
-                            style={{
-                              backgroundColor: msg.isRead ? '#fff' : '#f0f7ff',
-                              borderColor: msg.isRead ? '#e0e0e0' : '#88453d',
-                              cursor: 'pointer',
-                              transition: 'all 0.3s ease',
-                            }}
-                            onMouseEnter={(e) => {
-                              e.currentTarget.style.boxShadow =
-                                '0 4px 12px rgba(0, 0, 0, 0.1)';
-                              e.currentTarget.style.transform =
-                                'translateY(-2px)';
-                            }}
-                            onMouseLeave={(e) => {
-                              e.currentTarget.style.boxShadow = 'none';
-                              e.currentTarget.style.transform =
-                                'translateY(0)';
-                            }}
-                          >
-                            <div className="card-body p-3">
-                              <div className="d-flex justify-content-between align-items-start">
-                                <div className="flex-grow-1">
-                                  <h6 className="fw-bold mb-1">
-                                    {msg.isRead ? '📨' : '📬'} {msg.subject}
-                                  </h6>
-                                  <p className="text-muted small mb-2">
-                                    <strong>De:</strong> {msg.sender.name}
-                                  </p>
-                                  <p className="mb-2">{msg.body}</p>
-                                  <small className="text-muted">
-                                    {new Date(msg.createdAt).toLocaleString(
-                                      'pt-BR'
-                                    )}
-                                  </small>
-                                </div>
-                                {!msg.isRead && (
-                                  <span className="badge bg-danger">Novo</span>
-                                )}
+                      <div className="space-y-2">
+                        {messages.map((msg) => {
+                          // Preview do corpo (primeiros 80 caracteres)
+                          const bodyPreview =
+                            msg.body.length > 80
+                              ? msg.body.substring(0, 80) + '...'
+                              : msg.body;
+
+                          return (
+                            <div
+                              key={msg.id}
+                              onClick={() =>
+                                handleSelectConversation(
+                                  msg.sender.id === userId
+                                    ? msg.receiver.id
+                                    : msg.sender.id
+                                )
+                              }
+                              className="card border"
+                              style={{
+                                backgroundColor: msg.isRead ? '#fff' : '#f0f7ff',
+                                borderColor: msg.isRead
+                                  ? '#e0e0e0'
+                                  : '#88453d',
+                                cursor: 'pointer',
+                                transition: 'all 0.3s ease',
+                                padding: '12px',
+                              }}
+                              onMouseEnter={(e) => {
+                                e.currentTarget.style.boxShadow =
+                                  '0 4px 12px rgba(0, 0, 0, 0.1)';
+                                e.currentTarget.style.transform =
+                                  'translateY(-2px)';
+                              }}
+                              onMouseLeave={(e) => {
+                                e.currentTarget.style.boxShadow = 'none';
+                                e.currentTarget.style.transform =
+                                  'translateY(0)';
+                              }}
+                            >
+                              <div style={{ margin: 0 }}>
+                                <h6
+                                  className="fw-bold mb-1"
+                                  style={{ fontSize: '14px' }}
+                                >
+                                  {msg.isRead ? '📨' : '📬'} {msg.subject}
+                                </h6>
+                                <p
+                                  className="text-muted small mb-2"
+                                  style={{ marginBottom: '6px' }}
+                                >
+                                  De: {msg.sender.name}
+                                </p>
+                                <p
+                                  className="text-muted small mb-2"
+                                  style={{
+                                    marginBottom: '8px',
+                                    fontSize: '13px',
+                                    color: '#555',
+                                    lineHeight: '1.4',
+                                  }}
+                                >
+                                  {bodyPreview}
+                                </p>
+                                <small
+                                  className="text-muted"
+                                  style={{ fontSize: '12px' }}
+                                >
+                                  {new Date(msg.createdAt).toLocaleString(
+                                    'pt-BR',
+                                    {
+                                      day: '2-digit',
+                                      month: '2-digit',
+                                      year: 'numeric',
+                                      hour: '2-digit',
+                                      minute: '2-digit',
+                                      second: '2-digit',
+                                    }
+                                  )}
+                                </small>
                               </div>
                             </div>
-                          </div>
-                        ))}
+                          );
+                        })}
                       </div>
                     )}
                   </div>
