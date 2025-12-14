@@ -22,19 +22,32 @@ type User = {
   role: string;
 };
 
+// ✅ COMPONENTE DE STATUS DE LEITURA - ESTILO WHATSAPP
 const CheckStatusIcon: React.FC<{ msg: Message; isOwn: boolean }> = ({ msg, isOwn }) => {
   if (!isOwn) return null;
 
   const style: React.CSSProperties = {
-    fontSize: '11px',
+    fontSize: '12px',
     marginLeft: '6px',
+    fontWeight: 'bold',
+    letterSpacing: '1px',
   };
 
+  // ✅ NÃO LIDO = Dois traços CINZAS
   if (!msg.isRead) {
-    return <span style={{ ...style, color: '#777' }}>✓✓</span>;
+    return (
+      <span style={{ ...style, color: '#999' }} title="Entregue">
+        ✓✓
+      </span>
+    );
   }
 
-  return <span style={{ ...style, color: '#2196f3' }}>✓✓</span>;
+  // ✅ LIDO = Dois traços AZUIS
+  return (
+    <span style={{ ...style, color: '#2196f3' }} title="Lido">
+      ✓✓
+    </span>
+  );
 };
 
 export default function MessagesPage() {
@@ -53,10 +66,12 @@ export default function MessagesPage() {
   const [body, setBody] = useState('');
   const [receiverId, setReceiverId] = useState('');
   const [search, setSearch] = useState('');
+  const [isSearching, setIsSearching] = useState(false);
 
   const markedAsReadRef = useRef<Set<number>>(new Set());
   const messagesEndRef = useRef<HTMLDivElement>(null);
 
+  // ✅ SETUP INICIAL
   useEffect(() => {
     const token =
       typeof window !== 'undefined' ? localStorage.getItem('token') : null;
@@ -74,16 +89,19 @@ export default function MessagesPage() {
     if (storedUserName) setUserName(storedUserName || '');
   }, [router]);
 
+  // ✅ CARREGAR DADOS
   useEffect(() => {
     if (!userId) return;
     loadUsers();
     loadMessages(null);
   }, [userId]);
 
+  // ✅ SCROLL AUTOMÁTICO
   useEffect(() => {
     messagesEndRef.current?.scrollIntoView({ behavior: 'smooth' });
   }, [conversationMessages]);
 
+  // ✅ CARREGAR USUÁRIOS
   async function loadUsers() {
     try {
       const res = await fetch('http://localhost:3001/users');
@@ -95,6 +113,7 @@ export default function MessagesPage() {
     }
   }
 
+  // ✅ CARREGAR MENSAGENS
   async function loadMessages(selectedReceiverId: number | null) {
     if (!userId) return;
 
@@ -109,18 +128,15 @@ export default function MessagesPage() {
       const data = await res.json();
       let list = Array.isArray(data) ? data : [];
 
-      // Se tem um receiverId selecionado, filtra SÓ as mensagens com aquela pessoa
       if (selectedReceiverId) {
-        list = list.filter(msg => 
+        list = list.filter(msg =>
           (msg.sender.id === userId && msg.receiver.id === selectedReceiverId) ||
           (msg.sender.id === selectedReceiverId && msg.receiver.id === userId)
         );
       }
 
-      // lista geral (para o painel de mensagens)
       setMessages(list);
 
-      // se tiver um usuário selecionado, esse retorno já é o histórico dessa conversa
       if (selectedReceiverId) {
         setConversationMessages(list);
       }
@@ -129,6 +145,64 @@ export default function MessagesPage() {
     }
   }
 
+  // ✅ MARCAR CONVERSA COMO LIDA - COM VALIDAÇÃO
+const handleSelectConversation = async (otherUserId: number) => {
+  // 🔧 VALIDAÇÃO #1 - Garantir que userId existe
+  if (!userId) {
+    console.error('❌ [ERRO] userId não está definido!');
+    return;
+  }
+
+  // 🔧 VALIDAÇÃO #2 - Garantir que otherUserId é número válido
+  if (!otherUserId || isNaN(otherUserId)) {
+    console.error('❌ [ERRO] otherUserId inválido:', otherUserId);
+    return;
+  }
+
+  console.log(`✅ [DEBUG] Abrindo conversa: userId=${userId}, otherUserId=${otherUserId}`);
+
+  setSelectedUserId(otherUserId);
+  const user = users.find(u => u.id === otherUserId);
+  if (user) setSelectedUserName(user.name);
+
+  // Carregar mensagens da conversa
+  await loadMessages(otherUserId);
+
+  // 🔧 MARCAR TODAS AS MENSAGENS COMO LIDAS
+  try {
+    const url = `http://localhost:3001/messages/conversation/read`;
+    console.log(`📤 [FETCH] POST ${url}`);
+    console.log(`📤 [BODY]`, { userId, otherUserId });
+
+    const res = await fetch(url, {
+      method: 'POST',
+      headers: {
+        'Content-Type': 'application/json',
+      },
+      body: JSON.stringify({
+        userId: userId,
+        otherUserId: otherUserId,
+      }),
+    });
+
+    console.log(`📥 [RESPONSE] Status: ${res.status}`);
+
+    const data = await res.json();
+    console.log(`📥 [RESPONSE] Data:`, data);
+
+    if (res.ok) {
+      console.log(`✅ [SUCESSO] ${data.affected || 0} mensagens marcadas como lidas`);
+      // Recarregar para atualizar status (✓✓ cinza → azul)
+      await loadMessages(otherUserId);
+    } else {
+      console.error(`❌ [ERRO] Status ${res.status}:`, data);
+    }
+  } catch (err) {
+    console.error('❌ [ERRO] Ao marcar como lido:', err);
+  }
+};
+
+  // ✅ ENVIAR MENSAGEM
   async function handleSend(e: React.FormEvent) {
     e.preventDefault();
     setError('');
@@ -168,13 +242,44 @@ export default function MessagesPage() {
     }
   }
 
-  const handleSelectConversation = (otherUserId: number) => {
-    setSelectedUserId(otherUserId);
-    const user = users.find(u => u.id === otherUserId);
-    if (user) setSelectedUserName(user.name);
-    loadMessages(otherUserId);
+  // ✅ BUSCAR HISTÓRICO
+  async function handleSearch(e: React.FormEvent) {
+    e.preventDefault();
+    if (!search.trim() || !userId) return;
+    setLoading(true);
+    setIsSearching(true);
+
+    try {
+      const res = await fetch(
+        `http://localhost:3001/messages/history?userId=${userId}&query=${encodeURIComponent(
+          search
+        )}`
+      );
+      if (!res.ok) throw new Error('Erro ao buscar');
+
+      const data = await res.json();
+      setMessages(Array.isArray(data) ? data : []);
+      setSelectedUserId(null);
+      setSelectedUserName('');
+      setConversationMessages([]);
+    } catch (err: any) {
+      setError(err.message);
+    } finally {
+      setLoading(false);
+    }
+  }
+
+  // ✅ LIMPAR BUSCA
+  const handleClearSearch = async () => {
+    setSearch('');
+    setIsSearching(false);
+    await loadMessages(null);
+    setSelectedUserId(null);
+    setSelectedUserName('');
+    setConversationMessages([]);
   };
 
+  // ✅ LOGOUT
   const handleLogout = () => {
     if (typeof window !== 'undefined') {
       localStorage.removeItem('token');
@@ -185,56 +290,7 @@ export default function MessagesPage() {
     router.push('/login');
   };
 
-  async function handleSearch(e: React.FormEvent) {
-  e.preventDefault();
-  if (!search.trim() || !userId) return;
-  setLoading(true);
-
-  try {
-    // 🔧 MUDE AQUI - use o endpoint correto
-    const res = await fetch(
-      `http://localhost:3001/messages/history?userId=${userId}&query=${encodeURIComponent(
-        search
-      )}`
-    );
-    if (!res.ok) throw new Error('Erro ao buscar');
-
-    const data = await res.json();
-    setMessages(Array.isArray(data) ? data : []);
-    setSelectedUserId(null);
-    setSelectedUserName('');
-    setConversationMessages([]);
-  } catch (err: any) {
-    setError(err.message);
-  } finally {
-    setLoading(false);
-  }
-}
-
-  useEffect(() => {
-    const markAsRead = async (messageId: number) => {
-      if (markedAsReadRef.current.has(messageId)) return;
-      markedAsReadRef.current.add(messageId);
-
-      try {
-        await fetch(`http://localhost:3001/messages/${messageId}`, {
-          method: 'PATCH',
-          headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify({ isRead: true }),
-        });
-      } catch {
-        // silencioso
-      }
-    };
-
-    messages.forEach((msg) => {
-      if (!msg.isRead) {
-        markAsRead(msg.id);
-      }
-    });
-  }, [messages]);
-
-  const unreadCount = messages.filter((m) => !m.isRead).length;
+  const unreadCount = messages.filter(m => !m.isRead).length;
 
   return (
     <div
@@ -296,7 +352,7 @@ export default function MessagesPage() {
       <div className="py-5 flex-grow-1">
         <div className="container-lg">
           <div className="row g-4">
-            {/* Nova Mensagem - Esquerda */}
+            {/* Nova Mensagem */}
             <div className="col-lg-4">
               <div className="card shadow-sm border-0 h-100">
                 <div className="card-body p-4">
@@ -322,10 +378,11 @@ export default function MessagesPage() {
                         className="form-select form-select-lg"
                         value={receiverId}
                         onChange={(e) => {
-                          const value = e.target.value ? Number(e.target.value) : '';
+                          const value = e.target.value
+                            ? Number(e.target.value)
+                            : '';
                           setReceiverId(value as any);
 
-                          // SE SELECIONOU ALGUÉM, ABRE A CONVERSA
                           if (value) {
                             handleSelectConversation(value as number);
                           }
@@ -338,11 +395,9 @@ export default function MessagesPage() {
                         }}
                       >
                         <option value="">Selecionar...</option>
-                        {users.map((u) => {
+                        {users.map(u => {
                           const displayLabel =
-                            u.role === 'gestor'
-                              ? `${u.name} (Gestor)`
-                              : u.name;
+                            u.role === 'gestor' ? `${u.name} (Gestor)` : u.name;
                           return (
                             <option key={u.id} value={u.id}>
                               {displayLabel}
@@ -359,7 +414,7 @@ export default function MessagesPage() {
                         className="form-control form-control-lg"
                         placeholder="Assunto da mensagem"
                         value={subject}
-                        onChange={(e) => setSubject(e.target.value)}
+                        onChange={e => setSubject(e.target.value)}
                         required
                         style={{ borderColor: '#e0e0e0' }}
                       />
@@ -371,7 +426,7 @@ export default function MessagesPage() {
                         className="form-control"
                         placeholder="Digite sua mensagem aqui..."
                         value={body}
-                        onChange={(e) => setBody(e.target.value)}
+                        onChange={e => setBody(e.target.value)}
                         rows={5}
                         required
                         style={{ borderColor: '#e0e0e0' }}
@@ -396,7 +451,7 @@ export default function MessagesPage() {
               </div>
             </div>
 
-            {/* Histórico e Conversa - Direita */}
+            {/* Histórico e Conversa */}
             <div className="col-lg-8">
               {/* Search */}
               <div className="card shadow-sm border-0 mb-4">
@@ -406,13 +461,25 @@ export default function MessagesPage() {
                     style={{ color: '#88453d' }}
                   >
                     🔍 Buscar Histórico
+                    {isSearching && (
+                      <span
+                        style={{
+                          fontSize: '12px',
+                          color: '#666',
+                          marginLeft: '10px',
+                          fontWeight: 'normal',
+                        }}
+                      >
+                        (Buscando por: "{search}")
+                      </span>
+                    )}
                   </h5>
                   <form onSubmit={handleSearch} className="d-flex gap-2">
                     <input
                       type="text"
                       className="form-control form-control-lg flex-grow-1"
                       value={search}
-                      onChange={(e) => setSearch(e.target.value)}
+                      onChange={e => setSearch(e.target.value)}
                       placeholder="Buscar por palavra..."
                       style={{ borderColor: '#e0e0e0' }}
                     />
@@ -426,13 +493,7 @@ export default function MessagesPage() {
                     <button
                       type="button"
                       className="btn btn-outline-secondary"
-                      onClick={() => {
-                        setSearch('');
-                        loadMessages(null);
-                        setSelectedUserId(null);
-                        setSelectedUserName('');
-                        setConversationMessages([]);
-                      }}
+                      onClick={handleClearSearch}
                       disabled={loading}
                     >
                       Limpar
@@ -443,7 +504,7 @@ export default function MessagesPage() {
 
               {/* Conversa ou Lista de Mensagens */}
               {selectedUserId ? (
-                // Conversa Detalhada
+                // CONVERSA DETALHADA
                 <div className="card shadow-sm border-0">
                   <div
                     className="card-header p-3"
@@ -474,18 +535,22 @@ export default function MessagesPage() {
                       </div>
                     ) : (
                       [...conversationMessages]
-                        .sort((a, b) =>
-                          new Date(a.createdAt).getTime() -
-                          new Date(b.createdAt).getTime()
+                        .sort(
+                          (a, b) =>
+                            new Date(a.createdAt).getTime() -
+                            new Date(b.createdAt).getTime()
                         )
-                        .map((msg) => (
+                        .map(msg => (
                           <div
                             key={msg.id}
                             style={{
                               marginBottom: '12px',
                               display: 'flex',
                               justifyContent:
-                                msg.sender.id === userId ? 'flex-end' : 'flex-start',
+                                msg.sender.id === userId
+                                  ? 'flex-end'
+                                  : 'flex-start',
+                              animation: 'fadeIn 0.3s ease-in',
                             }}
                           >
                             <div
@@ -499,6 +564,7 @@ export default function MessagesPage() {
                                   msg.sender.id === userId
                                     ? 'none'
                                     : '1px solid #e0e0e0',
+                                transition: 'all 0.3s ease',
                               }}
                             >
                               <p
@@ -511,9 +577,7 @@ export default function MessagesPage() {
                               >
                                 {msg.sender.name}
                               </p>
-                              <p
-                                style={{ margin: '4px 0', fontSize: '14px' }}
-                              >
+                              <p style={{ margin: '4px 0', fontSize: '14px' }}>
                                 {msg.body}
                               </p>
                               <small
@@ -545,7 +609,7 @@ export default function MessagesPage() {
                   </div>
                 </div>
               ) : (
-                // Lista de Mensagens Recentes - COM PREVIEW
+                // LISTA DE MENSAGENS
                 <div className="card shadow-sm border-0">
                   <div className="card-body p-4">
                     <h5
@@ -564,8 +628,7 @@ export default function MessagesPage() {
                       </div>
                     ) : (
                       <div className="space-y-2">
-                        {messages.map((msg) => {
-                          // Preview do corpo (primeiros 80 caracteres)
+                        {messages.map(msg => {
                           const bodyPreview =
                             msg.body.length > 80
                               ? msg.body.substring(0, 80) + '...'
@@ -591,13 +654,13 @@ export default function MessagesPage() {
                                 transition: 'all 0.3s ease',
                                 padding: '12px',
                               }}
-                              onMouseEnter={(e) => {
+                              onMouseEnter={e => {
                                 e.currentTarget.style.boxShadow =
                                   '0 4px 12px rgba(0, 0, 0, 0.1)';
                                 e.currentTarget.style.transform =
                                   'translateY(-2px)';
                               }}
-                              onMouseLeave={(e) => {
+                              onMouseLeave={e => {
                                 e.currentTarget.style.boxShadow = 'none';
                                 e.currentTarget.style.transform =
                                   'translateY(0)';
@@ -665,6 +728,19 @@ export default function MessagesPage() {
           </p>
         </div>
       </footer>
+
+      <style jsx>{`
+        @keyframes fadeIn {
+          from {
+            opacity: 0;
+            transform: translateY(10px);
+          }
+          to {
+            opacity: 1;
+            transform: translateY(0);
+          }
+        }
+      `}</style>
     </div>
   );
 }
