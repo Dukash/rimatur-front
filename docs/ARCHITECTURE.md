@@ -1,24 +1,25 @@
-# Arquitetura
+📐 Arquitetura
 
-Resumo da arquitetura do frontend:
+**Visão Geral**
 
-- Framework: Next.js (App Router)
-- Linguagem: TypeScript
-- Estilos: Tailwind CSS (devDependency) e BootStrap 5 instalado como dependência
-- Organização: rotas por pasta dentro de `app/` e componentes em `app/components/`.
+- **Frontend:** Next.js (App Router)
+- **Backend:** NestJS (REST API)
+- **Banco de dados:** PostgreSQL
 
-Rotas e layout
+Comunicação via HTTP/JSON (REST). Autenticação por JWT.
 
-- `app/layout.tsx` — layout principal (cabeçalho, rodapé, providers).
-- `app/page.tsx` — página raiz.
-- Pastas como `app/login/`, `app/register/`, `app/messages/` representam rotas.
+**Diagrama (simplificado)**
 
-Decisões de arquitetura
+![Diagrama de arquitetura](assets/architecture.svg)
 
-- Uso do App Router do Next.js para aproveitar layouts aninhados e rendering por rota.
-- Separação clara entre componentes reutilizáveis (`app/components/`) e páginas.
-- Estilos globais em `globals.css`.
+**Backend (padrão de responsabilidades)**
 
-Observações
+- Controller → Service → Repository (TypeORM) → Database
 
-- Se a aplicação consumir APIs externas, a documentação das integrações deve ser adicionada aqui (endpoints, formatos de resposta, autenticação).
+**Frontend (Next.js)**
+
+- App Router para rotas e UIs
+- Componentes reutilizáveis em `app/components/`
+- Chamadas ao backend via `NEXT_PUBLIC_API_BASE`
+
+Mantenha este documento curto: detalhes e migrações estão no repositório do backend.

@@ -1,36 +1,85 @@
-This is a [Next.js](https://nextjs.org) project bootstrapped with [`create-next-app`](https://nextjs.org/docs/app/api-reference/cli/create-next-app).
+# Rimatur — Frontend
 
-## Getting Started
+Uma interface web simples para o sistema Rimatur, construída com Next.js (App Router) e TypeScript.
 
-First, run the development server:
+**Principais tecnologias:** Next.js 16 · React 19 · TypeScript · Bootstrap 5 · Tailwind (dev)
+
+---
+
+## Índice
+
+- [Visão geral](#visão-geral)
+- [Principais comandos](#principais-comandos)
+- [Rodando localmente](#rodando-localmente)
+- [Estrutura do projeto](#estrutura-do-projeto)
+- [Rotas principais](#rotas-principais)
+- [Dicas de desenvolvimento](#dicas-de-desenvolvimento)
+- [Documentação](#documentação)
+- [Contato](#contato)
+
+---
+
+## Visão geral
+
+Frontend do sistema de mensagens Rimatur. Foco em páginas simples: login, registro e mensagens.
+
+## Principais comandos
+
+```bash
+npm install
+npm run dev      # desenvolvimento
+npm run build    # build de produção
+npm run start    # start em produção
+npm run lint     # lint
+npm run format   # formatação com Prettier
+```
+
+## Rodando localmente
+
+1. Instale dependências:
+
+```bash
+npm install
+```
+
+2. Rode em modo desenvolvimento:
 
 ```bash
 npm run dev
-# or
-yarn dev
-# or
-pnpm dev
-# or
-bun dev
 ```
 
-Open [http://localhost:3000](http://localhost:3000) with your browser to see the result.
+Abra http://localhost:3000 no navegador.
 
-You can start editing the page by modifying `app/page.tsx`. The page auto-updates as you edit the file.
+## Estrutura do projeto (resumo)
 
-This project uses [`next/font`](https://nextjs.org/docs/app/building-your-application/optimizing/fonts) to automatically optimize and load [Geist](https://vercel.com/font), a new font family for Vercel.
+- `app/` — App Router: `layout.tsx`, `page.tsx`, rotas em pastas (`login/`, `register/`, `messages/`, `rotinas/`).
+- `app/components/` — componentes reutilizáveis (ex.: `navbar.tsx`).
+- `public/` — recursos estáticos (imagens, logos).
 
-## Learn More
+## Rotas principais
 
-To learn more about Next.js, take a look at the following resources:
+- `/` — redireciona para `/login` — Arquivo: [app/page.tsx](app/page.tsx#L1)
+- `/login` — página de login — Arquivo: [app/login/page.tsx](app/login/page.tsx#L1)
+- `/register` — página de criação de conta — Arquivo: [app/register/page.tsx](app/register/page.tsx#L1)
+- `/messages` — lista de mensagens (comentários e detalhes em rotas filhas, ex.: `/messages/[id]`) — Arquivo: [app/messages/page.tsx](app/messages/page.tsx#L1)
+- `/rotinas` — lista e gerenciamento de rotinas — Arquivo: [app/rotinas/page.tsx](app/rotinas/page.tsx#L1)
 
-- [Next.js Documentation](https://nextjs.org/docs) - learn about Next.js features and API.
-- [Learn Next.js](https://nextjs.org/learn) - an interactive Next.js tutorial.
+## Dicas de desenvolvimento
 
-You can check out [the Next.js GitHub repository](https://github.com/vercel/next.js) - your feedback and contributions are welcome!
+- Estilos globais em `globals.css` e estilos customizados em `app/layout.tsx`.
+- O projeto usa Bootstrap (via import) e pode incluir Tailwind durante o desenvolvimento.
+- Para adicionar um novo componente, coloque em `app/components/` e documente em `docs/COMPONENTS.md`.
 
-## Deploy on Vercel
+## Documentação
 
-The easiest way to deploy your Next.js app is to use the [Vercel Platform](https://vercel.com/new?utm_medium=default-template&filter=next.js&utm_source=create-next-app&utm_campaign=create-next-app-readme) from the creators of Next.js.
+Documentação adicional e notas para apresentação estão em `docs/`:
 
-Check out our [Next.js deployment documentation](https://nextjs.org/docs/app/building-your-application/deploying) for more details.
+- [SETUP.md](docs/SETUP.md)
+- [ARCHITECTURE.md](docs/ARCHITECTURE.md)
+- [COMPONENTS.md](docs/COMPONENTS.md)
+- [ROUTES.md](docs/ROUTES.md)
+- [PRESENTATION_NOTES.md](docs/PRESENTATION_NOTES.md)
+
+---
+
+Última atualização: Dezembro 2025
