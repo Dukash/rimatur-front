@@ -186,29 +186,30 @@ export default function MessagesPage() {
   };
 
   async function handleSearch(e: React.FormEvent) {
-    e.preventDefault();
-    if (!search.trim() || !userId) return;
-    setLoading(true);
+  e.preventDefault();
+  if (!search.trim() || !userId) return;
+  setLoading(true);
 
-    try {
-      const res = await fetch(
-        `http://localhost:3001/messages?userId=${userId}&search=${encodeURIComponent(
-          search
-        )}`
-      );
-      if (!res.ok) throw new Error('Erro ao buscar');
+  try {
+    // 🔧 MUDE AQUI - use o endpoint correto
+    const res = await fetch(
+      `http://localhost:3001/messages/history?userId=${userId}&query=${encodeURIComponent(
+        search
+      )}`
+    );
+    if (!res.ok) throw new Error('Erro ao buscar');
 
-      const data = await res.json();
-      setMessages(Array.isArray(data) ? data : []);
-      setSelectedUserId(null);
-      setSelectedUserName('');
-      setConversationMessages([]);
-    } catch (err: any) {
-      setError(err.message);
-    } finally {
-      setLoading(false);
-    }
+    const data = await res.json();
+    setMessages(Array.isArray(data) ? data : []);
+    setSelectedUserId(null);
+    setSelectedUserName('');
+    setConversationMessages([]);
+  } catch (err: any) {
+    setError(err.message);
+  } finally {
+    setLoading(false);
   }
+}
 
   useEffect(() => {
     const markAsRead = async (messageId: number) => {
