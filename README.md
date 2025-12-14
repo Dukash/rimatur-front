@@ -1,8 +1,13 @@
 # Rimatur — Frontend
 
-Uma interface web simples para o sistema Rimatur, construída com Next.js (App Router) e TypeScript.
+Uma interface web o sistema Rimatech, construída com Next.js (App Router) e TypeScript.
 
 **Principais tecnologias:** Next.js 16 · React 19 · TypeScript · Bootstrap 5 · Tailwind (dev)
+
+---
+## Vídeo de funcionamento
+
+https://drive.google.com/drive/folders/1IFQ_UXXVO3_acToMum-WibK9AP29oWMc?usp=sharing
 
 ---
 
