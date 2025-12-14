@@ -8,10 +8,6 @@
 
 Comunicação via HTTP/JSON (REST). Autenticação por JWT.
 
-**Diagrama (simplificado)**
-
-![Diagrama de arquitetura](assets/architecture.svg)
-
 **Backend (padrão de responsabilidades)**
 
 - Controller → Service → Repository (TypeORM) → Database
