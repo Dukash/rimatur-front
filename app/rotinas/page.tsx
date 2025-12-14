@@ -48,15 +48,17 @@ export default function RotinasPage() {
   // Routine form state
   const [routineTitle, setRoutineTitle] = useState('');
   const [routineDescription, setRoutineDescription] = useState('');
-  const [routineCategory, setRoutineCategory] = useState<'manutencao' | 'reuniao' | 'documento' | 'outro'>('outro');
+  const [routineCategory, setRoutineCategory] = useState<
+    'manutencao' | 'reuniao' | 'documento' | 'outro'
+  >('outro');
   const [routineVisibility, setRoutineVisibility] = useState<'pessoal' | 'time'>('pessoal');
-  const [routineStartTime, setRoutineStartTime] = useState(new Date().toISOString().slice(0, 16));
+  const [routineStartTime, setRoutineStartTime] = useState(
+    new Date().toISOString().slice(0, 16),
+  );
   const [filterDate, setFilterDate] = useState(new Date().toISOString().split('T')[0]);
 
   const userId =
-    typeof window !== 'undefined'
-      ? Number(localStorage.getItem('userId'))
-      : null;
+    typeof window !== 'undefined' ? Number(localStorage.getItem('userId')) : null;
 
   const isGestor = userRole === 'gestor';
 
@@ -81,7 +83,7 @@ export default function RotinasPage() {
     try {
       const queryDate = date || filterDate;
       const res = await fetch(
-        `http://localhost:3001/routine?userId=${userId}&date=${queryDate}`
+        `http://localhost:3001/routine?userId=${userId}&date=${queryDate}`,
       );
 
       if (!res.ok) throw new Error('Erro ao carregar atividades');
@@ -138,9 +140,43 @@ export default function RotinasPage() {
     }
   }
 
+  // Marcar atividade como concluída
+  async function handleMarkAsCompleted(activity: RoutineActivity) {
+    try {
+      // Tarefa de TIME: só gestor pode concluir
+      if (activity.visibility === 'time' && !isGestor) {
+        alert('Apenas gestores podem marcar tarefas de grupo como concluídas.');
+        return;
+      }
+
+      // Tarefa PESSOAL: só o dono pode concluir
+      if (activity.visibility === 'pessoal' && activity.userId !== userId) {
+        alert('Você só pode concluir suas próprias tarefas pessoais.');
+        return;
+      }
+
+      const res = await fetch(`http://localhost:3001/routine/${activity.id}`, {
+        method: 'PATCH',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ status: 'concluida' }),
+      });
+
+      if (!res.ok) {
+        const data = await res.json().catch(() => ({}));
+        throw new Error(data.message || 'Erro ao atualizar atividade');
+      }
+
+      // Recarregar lista
+      await loadActivities();
+    } catch (err: any) {
+      console.error('Erro ao marcar como concluída:', err);
+      alert(err.message || 'Erro ao marcar como concluída');
+    }
+  }
+
   const totalActivities = activities.length;
   const completedActivities = activities.filter(
-    (a) => a.status === 'concluida'
+    (a) => a.status === 'concluida',
   ).length;
   const completionRate =
     totalActivities > 0
@@ -281,7 +317,7 @@ export default function RotinasPage() {
                               | 'manutencao'
                               | 'reuniao'
                               | 'documento'
-                              | 'outro'
+                              | 'outro',
                           )
                         }
                         style={{ borderColor: '#e0e0e0' }}
@@ -315,7 +351,7 @@ export default function RotinasPage() {
                           value={routineVisibility}
                           onChange={(e) =>
                             setRoutineVisibility(
-                              e.target.value as 'pessoal' | 'time'
+                              e.target.value as 'pessoal' | 'time',
                             )
                           }
                           style={{ borderColor: '#e0e0e0' }}
@@ -379,7 +415,8 @@ export default function RotinasPage() {
                           className="card border"
                           style={{
                             borderLeftWidth: '4px',
-                            borderLeftColor: statusColor[activity.status] || '#ccc',
+                            borderLeftColor:
+                              statusColor[activity.status] || '#ccc',
                             marginBottom: '12px',
                           }}
                         >
@@ -387,33 +424,78 @@ export default function RotinasPage() {
                             <div className="d-flex justify-content-between align-items-start">
                               <div className="flex-grow-1">
                                 <h6 className="fw-bold mb-1">
-                                  {categoryEmoji[activity.category]} {activity.title}
+                                  {categoryEmoji[activity.category]}{' '}
+                                  {activity.title}
                                 </h6>
                                 <p className="text-muted small mb-2">
                                   {activity.description}
                                 </p>
-                                <small className="text-muted">
+                                <small className="text-muted d-block mb-1">
                                   ⏰{' '}
                                   {new Date(
-                                    activity.startTime
+                                    activity.startTime,
                                   ).toLocaleString('pt-BR')}
                                 </small>
+
+                                {activity.visibility === 'time' && (
+                                  <small className="badge bg-info mt-1">
+                                    👥 Time
+                                  </small>
+                                )}
                               </div>
-                              <span
-                                className="badge"
-                                style={{
-                                  backgroundColor: statusColor[activity.status],
-                                  color: 'white',
-                                }}
-                              >
-                                {statusLabel[activity.status]}
-                              </span>
+
+                              <div className="d-flex flex-column align-items-end gap-2">
+                                <span
+                                  className="badge"
+                                  style={{
+                                    backgroundColor:
+                                      statusColor[activity.status],
+                                    color: 'white',
+                                  }}
+                                >
+                                  {statusLabel[activity.status]}
+                                </span>
+
+                                {activity.status !== 'concluida' && (
+                                  <button
+                                    type="button"
+                                    className="btn btn-sm"
+                                    onClick={() =>
+                                      handleMarkAsCompleted(activity)
+                                    }
+                                    disabled={
+                                      (activity.visibility === 'pessoal' &&
+                                        activity.userId !== userId) ||
+                                      (activity.visibility === 'time' &&
+                                        !isGestor)
+                                    }
+                                    title={
+                                      activity.visibility === 'pessoal' &&
+                                      activity.userId !== userId
+                                        ? 'Você só pode concluir suas tarefas pessoais'
+                                        : activity.visibility === 'time' &&
+                                          !isGestor
+                                        ? 'Apenas gestores podem concluir tarefas de grupo'
+                                        : 'Marcar como concluída'
+                                    }
+                                    style={{
+                                      backgroundColor: '#4CAF50',
+                                      color: 'white',
+                                      fontWeight: 600,
+                                      opacity:
+                                        (activity.visibility === 'pessoal' &&
+                                          activity.userId !== userId) ||
+                                        (activity.visibility === 'time' &&
+                                          !isGestor)
+                                          ? 0.5
+                                          : 1,
+                                    }}
+                                  >
+                                    ✓ Concluir
+                                  </button>
+                                )}
+                              </div>
                             </div>
-                            {activity.visibility === 'time' && (
-                              <small className="badge bg-info mt-2">
-                                👥 Time
-                              </small>
-                            )}
                           </div>
                         </div>
                       ))}
